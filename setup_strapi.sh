@@ -8,6 +8,20 @@ exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 echo "Starting user data script..."
 sudo apt-get update -y
 sudo apt-get upgrade -y
+
+# ... after apt-get upgrade -y
+
+# --- Create and Activate a Swap File for Memory ---
+echo "Creating swap file for memory-intensive build..."
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
+# --- Node.js and PM2 Installation ---
+echo "Installing Node.js and PM2..."
+# ... rest of your script continues here
 # Install git, nginx, and other tools for the script
 sudo apt-get install -y nginx git expect
 
@@ -24,6 +38,7 @@ echo "Cloning Strapi repository from ${strapi_repo_url}..."
 git clone ${strapi_repo_url}
 # Dynamically get the repo folder name
 REPO_DIR=$(basename "${strapi_repo_url}" .git)
+sudo chown -R ubuntu:ubuntu /home/ubuntu/$REPO_DIR
 cd $REPO_DIR
 
 # --- Strapi Configuration ---
@@ -32,11 +47,11 @@ npm install # Install all dependencies first to get strapi command
 
 # Generate Strapi APP_KEYS and other secrets
 echo "Generating Strapi secret keys..."
-keys_output=$(npm run strapi generate)
-app_keys=$(echo "$keys_output" | grep -o 'APP_KEYS=[^,]*' | awk -F= '{print $2}')
-api_token_salt=$(echo "$keys_output" | grep -o 'API_TOKEN_SALT=[^,]*' | awk -F= '{print $2}')
-admin_jwt_secret=$(echo "$keys_output" | grep -o 'ADMIN_JWT_SECRET=[^,]*' | awk -F= '{print $2}')
-jwt_secret=$(echo "$keys_output" | grep -o 'JWT_SECRET=[^,]*' | awk -F= '{print $2}')
+app_keys=$(openssl rand -base64 16),$(openssl rand -base64 16)
+api_token_salt=$(openssl rand -base64 32)
+admin_jwt_secret=$(openssl rand -base64 32)
+jwt_secret=$(openssl rand -base64 32)
+transfer_token_salt=$(openssl rand -base64 32)
 
 # Create the .env file with values from Terraform
 echo "Creating .env file..."
@@ -47,13 +62,14 @@ APP_KEYS=$app_keys
 API_TOKEN_SALT=$api_token_salt
 ADMIN_JWT_SECRET=$admin_jwt_secret
 JWT_SECRET=$jwt_secret
+TRANSFER_TOKEN_SALT=$transfer_token_salt
 DATABASE_CLIENT=postgres
 DATABASE_HOST=${db_host}
 DATABASE_PORT=5432
 DATABASE_NAME=${db_name}
 DATABASE_USERNAME=${db_username}
 DATABASE_PASSWORD='${db_password}'
-DATABASE_SSL=false
+DATABASE_SSL=true
 AWS_ACCESS_KEY_ID=${aws_access_key_id}
 AWS_ACCESS_SECRET=${aws_secret_access_key}
 AWS_REGION=${aws_region}
@@ -85,7 +101,8 @@ sudo chown -R ubuntu:ubuntu /home/ubuntu/$REPO_DIR
 NODE_ENV=production npm run build
 # Start the application with PM2
 echo "Starting Strapi with PM2..."
-pm2 start npm --name strapi -- run start
+# pm2 start npm --name strapi -- run start
+sudo pm2 start ecosystem.config.js --env production
 # Ensure PM2 restarts on server reboot
 pm2 startup
 pm2 save
