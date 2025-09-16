@@ -146,7 +146,7 @@ resource "aws_security_group" "ec2" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # WARNING: Open to the world. For production, restrict this to your IP.
+    security_groups = [aws_security_group.bastion.id] # WARNING: Open to the world. For production, restrict this to your IP.
   }
 
   egress {
@@ -167,6 +167,26 @@ resource "aws_security_group" "rds" {
     to_port         = 5432
     protocol        = "tcp"
     security_groups = [aws_security_group.ec2.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_security_group" "bastion" {
+  name        = "${lower(var.project_name)}-bastion-sg"
+  description = "Allow SSH from my IP"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = [var.my_ip_address]
   }
 
   egress {
@@ -253,6 +273,18 @@ resource "aws_db_instance" "main" {
 }
 
 # --- EC2 Instance & ALB ---
+resource "aws_instance" "bastion" {
+  ami                    = data.aws_ami.ubuntu.id
+  instance_type          = "t2.micro" # A small instance is enough
+  subnet_id              = aws_subnet.public[0].id
+  key_name               = var.key_name
+  vpc_security_group_ids = [aws_security_group.bastion.id]
+
+  tags = {
+    Name = "${lower(var.project_name)}-bastion-host"
+  }
+}
+
 resource "aws_lb" "main" {
   name               = "${var.project_name}-alb"
   internal           = false
@@ -308,14 +340,15 @@ resource "aws_instance" "strapi" {
       type        = "ssh"
       user        = "ubuntu"
       private_key = file("${path.module}/${var.key_name}.pem") # Ensure this path is correct
-      host        = self.public_ip
+      host        = self.private_ip # <-- Connect to the PRIVATE IP of the Strapi instance
+      bastion_host = aws_instance.bastion.public_ip # <-- Use the new Bastion as the jump host
     }
   }
 
    # ===================================================================
   # ADD THIS LINE
   # ===================================================================
-  associate_public_ip_address = true
+  associate_public_ip_address = false
   # ===================================================================
 
   user_data = templatefile("${path.module}/setup_strapi.sh", {

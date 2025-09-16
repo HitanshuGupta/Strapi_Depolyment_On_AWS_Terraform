@@ -21,7 +21,7 @@ variable "vpc_cidr" {
 variable "instance_type" {
   description = "The EC2 instance type for the Strapi server."
   type        = string
-  default     = "t3.small"
+  default     = "t3.large"
 }
 
 variable "key_name" {
@@ -55,4 +55,9 @@ variable "db_password" {
   description = "The master password for the RDS database."
   type        = string
   sensitive   = true
+}
+
+variable "my_ip_address" {
+  description = "Your local public IP address for SSH access to the bastion host."
+  type        = string
 }
