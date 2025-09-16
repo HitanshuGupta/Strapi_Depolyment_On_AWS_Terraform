@@ -37,7 +37,7 @@ Before you begin, ensure you have the following installed and configured:
 2.  **Terraform CLI:** [Install Terraform](https://developer.hashicorp.com/terraform/downloads)
 3.  **AWS CLI:** [Install AWS CLI](https://aws.amazon.com/cli/) and configured with your credentials (`aws configure`).
 4.  **An EC2 Key Pair:** Create an EC2 Key Pair in the AWS region you plan to deploy to. Download the `.pem` file.
-5.  **A Strapi Project in a Git Repository:** Your Strapi application's source code must be hosted in a Git repository (e.g., on GitHub).
+5.  **A Strapi Project in a Git Repository:** Your Strapi application's source code must be hosted in a Git repository (e.g., on GitHub). PS: If you want to use mine strapi code repo: [Strapi Code Repo](https://github.com/HitanshuGupta/Strapi_Depolyment_On_AWS.git).
 
 -----
 
